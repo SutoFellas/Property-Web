@@ -8,7 +8,7 @@
 
     <div class="main-layout">
       <!-- Mobilde açılır sidebar overlay -->
-      <div v-if="sidebarOpen" class="sidebar-overlay" @click="toggleSidebar"></div>
+      <div v-if="sidebarOpen" class="sidebar-overlay active" @click="toggleSidebar"></div>
       <!-- Sidebar Filters -->
       <div class="sidebar" :class="{ 'sidebar-open': sidebarOpen }">
         <div class="sidebar-header">
@@ -173,9 +173,23 @@ export default {
       this.filteredListings = store.listings;
     }
   },
+  
+  beforeUnmount() {
+    // Component unmount olurken body scroll'unu restore et
+    document.body.style.overflow = 'auto'
+  },
   methods: {
     toggleSidebar() {
       this.sidebarOpen = !this.sidebarOpen
+      
+      // Mobilde body scroll'unu kontrol et
+      if (window.innerWidth <= 900) {
+        if (this.sidebarOpen) {
+          document.body.style.overflow = 'hidden'
+        } else {
+          document.body.style.overflow = 'auto'
+        }
+      }
     },
     sortListingsAndCloseSidebar() {
       this.sortListings()
@@ -628,150 +642,356 @@ export default {
 }
 
 /* Responsive Design */
-@media (max-width: 1024px) {
-  .sidebar {
-    position: fixed;
-    left: -320px;
-    top: 0;
-    height: 100vh;
-    z-index: 1000;
-    border-radius: 0;
-    overflow-y: auto;
-  }
-  
-  .sidebar-open {
-    left: 0;
-  }
-  
-  .mobile-filter-toggle {
-    display: block;
-  }
-  
-  .main-layout {
-    flex-direction: column;
-  }
-  
-  .content-area {
-    width: 100%;
-  }
+/* Viewport için temel ayarlar */
+.home {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
-@media (max-width: 768px) {
-  .listings-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .hero-section h1 {
-    font-size: 2rem;
-  }
-  
-  .sidebar {
-    width: 100%;
-    left: -100%;
-  }
-}
-
-@media (max-width: 1100px) {
-  .main-layout {
-    gap: 0.5rem;
-    width: 100%;
-  }
-  .sidebar {
-    width: 120px;
-    min-width: 80px;
-    max-width: 140px;
-    padding: 0.5rem 0.2rem;
-  }
-  .listings-grid {
-    max-width: 100%;
-    padding: 0;
-  }
-  .listing-card {
-    flex-direction: column;
-    min-height: 120px;
-    width: 100%;
-    max-width: 100%;
-  }
-  .listing-image {
-    width: 100%;
-    height: 120px;
-    flex: none;
-  }
-  .listing-content {
-    padding: 0.7rem 0.7rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .sidebar {
-    display: none;
-  }
-  .listing-card {
-    border-radius: 8px;
-    min-height: 80px;
-    width: 100%;
-    max-width: 100%;
-  }
-  .listing-image {
-    height: 80px;
-  }
-  .listing-content {
-    padding: 0.4rem 0.4rem;
-  }
-  .listings-grid {
-    gap: 0.7rem;
-    padding: 0;
-  }
-}
-
+/* Sidebar overlay - mobilde filtrelerin arkasında */
 .sidebar-overlay {
   display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 998;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
-@media (max-width: 900px) {
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 9999;
-    background: #232323;
-    border-radius: 0;
-    box-shadow: 0 0 0 100vw rgba(0,0,0,0.5);
-    transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
-    overflow-y: auto;
-    padding: 2.5rem 1.2rem 2rem 1.2rem;
+
+.sidebar-overlay.active {
+  opacity: 1;
+}
+
+/* Büyük ekranlar için normal görünüm */
+@media (min-width: 901px) {
+  .mobile-filter-toggle {
+    display: none !important;
   }
-  .sidebar.sidebar-open {
-    transform: translateX(0);
-  }
+  
   .sidebar-overlay {
-    display: block;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.5);
-    z-index: 9998;
+    display: none !important;
   }
+}
+
+/* Tablet ve mobil için */
+@media (max-width: 900px) {
+  /* Ana düzen değişiklikleri */
   .main-layout {
     flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
-  .mobile-filter-toggle.always-visible {
+
+  /* Mobil filtre toggle butonu */
+  .mobile-filter-toggle {
     display: flex !important;
     position: sticky;
     top: 0;
-    z-index: 10000;
-    background: #232323;
-    padding: 0.5rem 0;
-    justify-content: flex-start;
+    z-index: 100;
+    background: linear-gradient(135deg, #232323 0%, #2c2c2c 100%);
+    padding: 1rem;
+    margin: 0 -1rem 1rem -1rem;
+    border-bottom: 1px solid #333;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .filter-toggle-btn {
+    background: linear-gradient(135deg, #cd7f32 0%, #a86828 100%);
+    color: #fff;
+    border: none;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(205, 127, 50, 0.3);
+    width: 100%;
+    justify-content: center;
+  }
+
+  .filter-toggle-btn:hover,
+  .filter-toggle-btn:active {
+    background: linear-gradient(135deg, #a86828 0%, #8b5720 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(205, 127, 50, 0.4);
+  }
+
+  .filter-toggle-btn span {
+    font-size: 1.2rem;
+  }
+
+  /* Sidebar mobil düzeni */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 999;
+    background: linear-gradient(135deg, #1a1a1a 0%, #232323 100%);
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    padding: 2rem 1.5rem;
+    box-sizing: border-box;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  /* Sidebar header mobilde */
+  .sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #333;
+  }
+
+  .sidebar-header h3 {
+    color: #cd7f32;
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 700;
+  }
+
+  .close-btn {
+    background: #cd7f32;
+    color: #fff;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(205, 127, 50, 0.3);
+  }
+
+  .close-btn:hover {
+    background: #a86828;
+    transform: scale(1.1);
+  }
+
+  /* Content area mobilde */
+  .content-area {
+    width: 100%;
+    max-width: 100vw;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  /* Listings grid mobilde */
+  .listings-grid {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  /* Listing card mobilde */
+  .listing-card {
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 1.5rem;
+    min-height: auto;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .listing-image {
+    width: 100%;
+    height: 200px;
+    flex: none;
+  }
+
+  .listing-content {
+    padding: 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .listing-content h3 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .listing-price {
+    font-size: 1.4rem;
+  }
+
+  .listing-details {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  /* Hero section mobilde */
+  .hero-section {
+    padding: 2rem 1rem;
+    text-align: center;
+  }
+
+  .hero-section h1 {
+    font-size: 2rem;
+  }
+
+  .hero-logo {
+    width: 80px;
+    height: 80px;
   }
 }
-@media (max-width: 600px) {
+
+/* Küçük mobil cihazlar */
+@media (max-width: 480px) {
+  .content-area {
+    padding: 0 0.5rem;
+  }
+
   .sidebar {
-    padding: 1.2rem 0.5rem 1.2rem 0.5rem;
+    padding: 1.5rem 1rem;
+  }
+
+  .listing-content {
+    padding: 1rem;
+  }
+
+  .listing-content h3 {
+    font-size: 1.2rem;
+  }
+
+  .listing-price {
+    font-size: 1.3rem;
+  }
+
+  .hero-section h1 {
+    font-size: 1.8rem;
+  }
+
+  .hero-logo {
+    width: 70px;
+    height: 70px;
+  }
+
+  .filter-toggle-btn {
+    padding: 0.8rem 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  .mobile-filter-toggle {
+    padding: 0.8rem;
+  }
+}
+
+/* Sidebar filter stilleri mobilde */
+@media (max-width: 900px) {
+  .filters {
+    gap: 2rem;
+  }
+
+  .filter-group {
+    gap: 0.8rem;
+  }
+
+  .filter-group label {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #cd7f32;
+  }
+
+  .filter-group select {
+    padding: 1rem;
+    font-size: 1rem;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #2c2c2c;
+    color: #fff;
+    transition: all 0.3s ease;
+  }
+
+  .filter-group select:focus {
+    border-color: #cd7f32;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(205, 127, 50, 0.2);
+  }
+
+  .sort-section {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #333;
+  }
+
+  .sort-section label {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #cd7f32;
+    margin-bottom: 0.8rem;
+    display: block;
+  }
+
+  .sort-section select {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1rem;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #2c2c2c;
+    color: #fff;
+    transition: all 0.3s ease;
+  }
+
+  .sort-section select:focus {
+    border-color: #cd7f32;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(205, 127, 50, 0.2);
+  }
+
+  /* Currency switcher mobilde */
+  .currency-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid #333;
+  }
+
+  /* Map section mobilde */
+  .sidebar-map-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid #333;
+  }
+
+  .sidebar-map-section h2 {
+    font-size: 1.2rem;
+    color: #cd7f32;
+    font-weight: 700;
+  }
+
+  .sidebar-map-wrapper {
+    height: 300px;
+    border: 2px solid #333;
+    border-radius: 12px;
   }
 }
 </style> 
