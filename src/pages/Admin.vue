@@ -1,15 +1,34 @@
 <template>
   <div class="admin-container">
-    <div v-if="!isLoggedIn">
-      <h2>Admin Girişi</h2>
+    <!-- Loading durumu -->
+    <transition name="fade" mode="out-in">
+      <div v-if="isCheckingAuth" key="loading" class="auth-loading">
+        <div class="loading-spinner"></div>
+        <p>{{ isLoggingIn ? 'Giriş yapılıyor...' : 'Giriş kontrol ediliyor...' }}</p>
+      </div>
+      
+      <!-- Login formu -->
+      <div v-else-if="!isLoggedIn" key="login" class="login-form">
+        <h2>Admin Girişi</h2>
       <form @submit.prevent="login">
         <input v-model="email" type="email" placeholder="E-posta" required />
         <input v-model="password" type="password" placeholder="Şifre" required />
-        <button type="submit">Giriş Yap</button>
+        <div class="remember-me">
+          <label class="checkbox-container">
+            <input v-model="rememberMe" type="checkbox">
+            <span class="checkmark"></span>
+            Beni hatırla
+          </label>
+        </div>
+        <button type="submit" :disabled="isCheckingAuth">
+          {{ isCheckingAuth ? 'Giriş yapılıyor...' : 'Giriş Yap' }}
+        </button>
         <p v-if="error" class="error">{{ error }}</p>
       </form>
-            </div>
-    <div v-else>
+      </div>
+      
+      <!-- Admin paneli -->
+      <div v-else key="admin" class="admin-panel">
       <h2>İlan Ekle</h2>
       <form @submit.prevent="addListing">
         <input v-model="title" placeholder="Başlık" required />
@@ -82,7 +101,8 @@
         </div>
       </div>
       <button @click="logout">Çıkış Yap</button>
-    </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -95,11 +115,17 @@ import MapView from '../components/MapView.vue';
 
 export default {
   components: { ImageUploader, MapView },
+  mounted() {
+    this.checkRememberedLogin();
+  },
   data() {
     return {
       email: '',
       password: '',
+      rememberMe: false,
       isLoggedIn: false,
+      isCheckingAuth: true,
+      isLoggingIn: false,
       error: '',
   title: '',
   location: '',
@@ -118,24 +144,103 @@ export default {
     };
   },
   methods: {
+    async checkRememberedLogin() {
+      // Minimum 1 saniye loading göster
+      const minLoadingTime = 1000;
+      const startTime = Date.now();
+      
+      const rememberedAuth = localStorage.getItem('adminRememberMe');
+      if (rememberedAuth) {
+        try {
+          const authData = JSON.parse(rememberedAuth);
+          // Son giriş tarihini kontrol et (7 gün geçerli)
+          const lastLogin = new Date(authData.timestamp);
+          const now = new Date();
+          const daysDiff = (now - lastLogin) / (1000 * 60 * 60 * 24);
+          
+          if (daysDiff <= 7 && authData.email === 'admin@property.com') {
+            this.email = authData.email;
+            this.password = authData.password;
+            this.rememberMe = true;
+            await this.autoLogin();
+          } else {
+            // Süresi dolmuş, temizle
+            localStorage.removeItem('adminRememberMe');
+          }
+        } catch (error) {
+          // Hatalı JSON, temizle
+          localStorage.removeItem('adminRememberMe');
+        }
+      }
+      
+      // Minimum loading süresini bekle
+      const elapsed = Date.now() - startTime;
+      if (elapsed < minLoadingTime) {
+        await new Promise(resolve => setTimeout(resolve, minLoadingTime - elapsed));
+      }
+      
+      this.isCheckingAuth = false;
+    },
+    
+    async autoLogin() {
+      try {
+        await signInWithEmailAndPassword(auth, this.email, this.password);
+        this.isLoggedIn = true;
+      } catch (e) {
+        // Otomatik giriş başarısız, localStorage'ı temizle
+        localStorage.removeItem('adminRememberMe');
+        this.rememberMe = false;
+      }
+    },
+    
     async login() {
       this.error = '';
       if (this.email !== 'admin@property.com') {
         this.error = 'Sadece admin girişi yapılabilir.';
         return;
       }
+      
+      this.isCheckingAuth = true;
+      this.isLoggingIn = true;
+      
       try {
         await signInWithEmailAndPassword(auth, this.email, this.password);
+        
+        // Beni hatırla seçiliyse localStorage'a kaydet
+        if (this.rememberMe) {
+          const authData = {
+            email: this.email,
+            password: this.password,
+            timestamp: new Date().toISOString()
+          };
+          localStorage.setItem('adminRememberMe', JSON.stringify(authData));
+        } else {
+          // Beni hatırla seçili değilse localStorage'ı temizle
+          localStorage.removeItem('adminRememberMe');
+        }
+        
+        // Kısa bir geçiş animasyonu için bekle
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         this.isLoggedIn = true;
-      } catch (e) {
-        this.error = 'Giriş başarısız: ' + e.message;
-      }
+              } catch (e) {
+          this.error = 'Giriş başarısız: ' + e.message;
+        }
+        
+        this.isCheckingAuth = false;
+        this.isLoggingIn = false;
     },
+    
     async logout() {
       await signOut(auth);
       this.isLoggedIn = false;
+      
+      // Çıkış yaparken localStorage'ı temizle
+      localStorage.removeItem('adminRememberMe');
+      
       this.email = '';
       this.password = '';
+      this.rememberMe = false;
     },
     async addListing() {
       this.addError = '';
@@ -212,6 +317,56 @@ export default {
   border-radius: 16px;
   background: #2c2c2c;
   box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* Auth Loading Styles */
+.auth-loading {
+  text-align: center;
+  padding: 3rem 0;
+  color: #fff;
+}
+
+.auth-loading .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #444;
+  border-top: 3px solid #cd7f32;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+.auth-loading p {
+  color: #ccc;
+  font-size: 1rem;
+  margin: 0;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Fade Transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Button disabled state */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  background: #cd7f32;
+  transform: none;
 }
 input, textarea, select {
   display: block;
@@ -389,5 +544,72 @@ button:hover {
   font-size: 0.9rem;
   text-transform: uppercase;
   font-weight: 500;
+}
+
+/* Remember Me Checkbox Styles */
+.remember-me {
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #fff;
+  font-size: 0.95rem;
+  user-select: none;
+}
+
+.checkbox-container input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.checkmark {
+  height: 20px;
+  width: 20px;
+  background-color: #333;
+  border: 2px solid #555;
+  border-radius: 4px;
+  margin-right: 0.5rem;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.checkbox-container:hover .checkmark {
+  border-color: #cd7f32;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+  background-color: #cd7f32;
+  border-color: #cd7f32;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.checkbox-container .checkmark:after {
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-container:hover {
+  color: #cd7f32;
 }
 </style> 
