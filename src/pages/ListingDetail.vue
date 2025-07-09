@@ -124,6 +124,15 @@
         </div>
       </section>
     </div>
+    
+    <!-- Loading state -->
+    <div v-else-if="loading" class="loading">
+      <div class="loading-spinner"></div>
+      <h2>İlan yükleniyor...</h2>
+      <p>Lütfen bekleyin</p>
+    </div>
+    
+    <!-- Not found state - sadece loading tamamlandıktan sonra göster -->
     <div v-else class="not-found">
       <h2>İlan bulunamadı</h2>
       <p>Aradığınız ilan yayından kaldırılmış veya silinmiş olabilir.</p>
@@ -156,6 +165,8 @@ import { useListingsStore } from '../store/listings'
 import { storeToRefs } from 'pinia'
 import CurrencySwitcher from '../components/CurrencySwitcher.vue'
 import MapView from '../components/MapView.vue'
+import { db } from '../firebase'
+import { doc, getDoc } from 'firebase/firestore'
 
 const route = useRoute()
 const listingsStore = useListingsStore()
@@ -164,11 +175,31 @@ const { selectedCurrency, currencyRates } = storeToRefs(listingsStore)
 // State
 const currentImageIndex = ref(0)
 const showLightbox = ref(false)
+const listing = ref(null)
+const loading = ref(true)
 
-// Get listing from store
-const listing = computed(() => {
-  const id = parseInt(route.params.id)
-  return listingsStore.getListingById(id)
+// Fetch listing from Firebase
+onMounted(async () => {
+  try {
+    const listingId = route.params.id
+    const docRef = doc(db, 'listings', listingId)
+    const docSnap = await getDoc(docRef)
+    
+    if (docSnap.exists()) {
+      listing.value = { id: docSnap.id, ...docSnap.data() }
+    } else {
+      // Store'dan da dene
+      const storeId = parseInt(listingId)
+      listing.value = listingsStore.getListingById(storeId)
+    }
+  } catch (error) {
+    console.error('Error fetching listing:', error)
+    // Store'dan dene
+    const storeId = parseInt(route.params.id)
+    listing.value = listingsStore.getListingById(storeId)
+  } finally {
+    loading.value = false
+  }
 })
 
 // Current image
@@ -842,6 +873,39 @@ onMounted(() => {
     height: 44px;
     font-size: 1.7rem;
   }
+}
+
+/* Loading styles */
+.loading {
+  max-width: 500px;
+  margin: 4rem auto;
+  background: #232323;
+  color: #fff;
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  text-align: center;
+}
+
+.loading h2 {
+  color: #cd7f32;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #444;
+  border-top: 4px solid #cd7f32;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1.5rem auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .not-found {

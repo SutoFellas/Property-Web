@@ -2,117 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useListingsStore = defineStore('listings', () => {
-  // State
-  const listings = ref([
-    {
-      id: 1,
-      title: 'Modern 3+1 Daire',
-      location: 'Kadıköy, İstanbul',
-      region: 'İstanbul',
-      price: 2500000,
-      area: 120,
-      rooms: 3,
-      type: 'Satılık',
-      category: 'apartment',
-      propertyType: 'apartment',
-      transactionType: 'sale',
-      images: [
-        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400',
-        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300',
-        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=400',
-        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=500'
-      ],
-      coordinates: { lat: 40.9909, lng: 29.0303 },
-      description: 'Kadıköy\'ün merkezi konumunda, yeni yapılmış modern 3+1 daire. Metro ve otobüs duraklarına yürüme mesafesinde. Asansörlü, güvenlikli site içerisinde.',
-      createdAt: 1719859200000 // örnek: 2024-07-02
-    },
-    {
-      id: 2,
-      title: 'Merkezi Konumda Dükkan',
-      location: 'Beşiktaş, İstanbul',
-      region: 'İstanbul',
-      price: 8500,
-      area: 80,
-      rooms: 1,
-      type: 'Kiralık',
-      category: 'shop',
-      propertyType: 'shop',
-      transactionType: 'rent',
-      images: [
-        'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400',
-        'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300',
-        'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400'
-      ],
-      coordinates: { lat: 41.0422, lng: 29.0083 },
-      description: 'Beşiktaş\'ın en işlek caddesinde, yüksek ciro potansiyeli olan dükkan. Vitrin genişliği 4 metre, depo alanı mevcut.',
-      createdAt: 1719772800000 // örnek: 2024-07-01
-    },
-    {
-      id: 3,
-      title: 'Bahçeli Müstakil Ev',
-      location: 'Çankaya, Ankara',
-      region: 'Ankara',
-      price: 3500000,
-      area: 200,
-      rooms: 4,
-      type: 'Satılık',
-      category: 'house',
-      propertyType: 'house',
-      transactionType: 'sale',
-      images: [
-        'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400',
-        'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=300',
-        'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=400',
-        'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=500',
-        'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=600'
-      ],
-      coordinates: { lat: 39.9334, lng: 32.8597 },
-      description: 'Çankaya\'nın prestijli semtinde, 200m² bahçeli müstakil ev. 4 yatak odası, 2 banyo, geniş salon ve mutfak. Otopark dahil.',
-      createdAt: 1719686400000 // örnek: 2024-06-30
-    },
-    {
-      id: 4,
-      title: 'Deniz Manzaralı Daire',
-      location: 'Konak, İzmir',
-      region: 'İzmir',
-      price: 1800000,
-      area: 95,
-      rooms: 2,
-      type: 'Satılık',
-      category: 'apartment',
-      propertyType: 'apartment',
-      transactionType: 'sale',
-      images: [
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400',
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&h=300',
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&h=400'
-      ],
-      coordinates: { lat: 38.4192, lng: 27.1287 },
-      description: 'İzmir\'in en güzel semtlerinden Konak\'ta, deniz manzaralı 2+1 daire. Yeni yapılmış, asansörlü ve güvenlikli.',
-      createdAt: 1719600000000 // örnek: 2024-06-29
-    },
-    {
-      id: 5,
-      title: 'Villa Kiralık',
-      location: 'Konyaaltı, Antalya',
-      region: 'Antalya',
-      price: 12000,
-      area: 180,
-      rooms: 3,
-      type: 'Kiralık',
-      category: 'house',
-      propertyType: 'house',
-      transactionType: 'rent',
-      images: [
-        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=400',
-        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=400&h=300',
-        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=400&h=400'
-      ],
-      coordinates: { lat: 36.8969, lng: 30.7133 },
-      description: 'Antalya\'nın en güzel plajlarından Konyaaltı\'nda, özel havuzlu villa. 3 yatak odası, 2 banyo, geniş teras.',
-      createdAt: 1719513600000 // örnek: 2024-06-28
-    }
-  ])
+  // State - boş başlıyor, Firebase'den dolacak
+  const listings = ref([])
 
   // Currency state
   const selectedCurrency = ref('TRY')
@@ -188,6 +79,10 @@ export const useListingsStore = defineStore('listings', () => {
     currencyRates.value = { ...currencyRates.value, ...rates }
   }
 
+  const setListings = (newListings) => {
+    listings.value = newListings
+  }
+
   return {
     // State
     listings,
@@ -206,6 +101,7 @@ export const useListingsStore = defineStore('listings', () => {
     deleteListing,
     updatePrice,
     setCurrency,
-    updateCurrencyRates
+    updateCurrencyRates,
+    setListings
   }
 }) 

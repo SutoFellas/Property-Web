@@ -8,22 +8,29 @@
     <!-- Upload Area -->
     <div 
       class="upload-area"
-      :class="{ 'drag-over': isDragOver, 'disabled': uploadedImages.length >= maxImages }"
+      :class="{ 'drag-over': isDragOver, 'disabled': uploadedImages.length >= maxImages || uploading }"
       @drop="handleDrop"
       @dragover="handleDragOver"
       @dragleave="handleDragLeave"
       @click="triggerFileInput"
     >
-      <div class="upload-content" v-if="uploadedImages.length === 0">
+      <div class="upload-content" v-if="uploadedImages.length === 0 && !uploading">
         <div class="upload-icon">📷</div>
         <p>Resimleri buraya sürükleyin veya tıklayın</p>
         <p class="upload-hint">Maksimum {{ maxImages }} resim yükleyebilirsiniz</p>
+        <p class="upload-hint">Cloudinary ile otomatik optimizasyon</p>
       </div>
       
-      <div class="upload-content" v-else-if="uploadedImages.length < maxImages">
+      <div class="upload-content" v-else-if="uploadedImages.length < maxImages && !uploading">
         <div class="upload-icon">➕</div>
         <p>Daha fazla resim ekleyin</p>
         <p class="upload-hint">{{ maxImages - uploadedImages.length }} resim daha ekleyebilirsiniz</p>
+      </div>
+      
+      <div class="upload-content" v-else-if="uploading">
+        <div class="upload-icon">⏳</div>
+        <p>Resimler Cloudinary'ye yükleniyor...</p>
+        <p class="upload-hint">Lütfen bekleyin</p>
       </div>
       
       <div class="upload-content" v-else>
@@ -42,6 +49,20 @@
       style="display: none"
     >
     
+    <!-- Upload Progress -->
+    <div class="upload-progress" v-if="uploading">
+      <div class="progress-bar">
+        <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+      </div>
+      <span class="progress-text">{{ currentUploadFile }} ({{ uploadProgress }}%)</span>
+    </div>
+    
+    <!-- Upload Error -->
+    <div class="upload-error" v-if="uploadError">
+      <p>❌ {{ uploadError }}</p>
+      <button @click="uploadError = ''" class="retry-btn">Tamam</button>
+    </div>
+    
     <!-- Uploaded Images Grid -->
     <div class="images-grid" v-if="uploadedImages.length > 0">
       <div 
@@ -49,7 +70,7 @@
         :key="index"
         class="image-item"
       >
-        <img :src="image.url" :alt="`Resim ${index + 1}`">
+        <img :src="image.thumbnail || image.url" :alt="`Resim ${index + 1}`">
         <div class="image-overlay">
           <button @click="removeImage(index)" class="remove-btn" title="Resmi Kaldır">
             ×
@@ -62,21 +83,17 @@
           </button>
         </div>
         <div class="image-number">{{ index + 1 }}</div>
+        <div class="image-info" v-if="image.publicId">
+          <small>{{ formatFileSize(image.bytes) }}</small>
+        </div>
       </div>
-    </div>
-    
-    <!-- Upload Progress -->
-    <div class="upload-progress" v-if="uploading">
-      <div class="progress-bar">
-        <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
-      </div>
-      <span class="progress-text">{{ uploadProgress }}%</span>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import { uploadImageToCloudinary, getThumbnailUrl } from '../utils/cloudinary.js'
 
 // Props
 const props = defineProps({
@@ -98,6 +115,8 @@ const fileInput = ref(null)
 const isDragOver = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
+const currentUploadFile = ref('')
+const uploadError = ref('')
 
 // Computed
 const uploadedImages = computed({
@@ -107,7 +126,7 @@ const uploadedImages = computed({
 
 // Methods
 const triggerFileInput = () => {
-  if (uploadedImages.value.length >= props.maxImages) return
+  if (uploadedImages.value.length >= props.maxImages || uploading.value) return
   fileInput.value.click()
 }
 
@@ -121,7 +140,7 @@ const handleDrop = (event) => {
   event.preventDefault()
   isDragOver.value = false
   
-  if (uploadedImages.value.length >= props.maxImages) return
+  if (uploadedImages.value.length >= props.maxImages || uploading.value) return
   
   const files = Array.from(event.dataTransfer.files)
   processFiles(files)
@@ -129,7 +148,7 @@ const handleDrop = (event) => {
 
 const handleDragOver = (event) => {
   event.preventDefault()
-  if (uploadedImages.value.length < props.maxImages) {
+  if (uploadedImages.value.length < props.maxImages && !uploading.value) {
     isDragOver.value = true
   }
 }
@@ -139,48 +158,67 @@ const handleDragLeave = (event) => {
   isDragOver.value = false
 }
 
-const processFiles = (files) => {
+const processFiles = async (files) => {
   const imageFiles = files.filter(file => file.type.startsWith('image/'))
   const remainingSlots = props.maxImages - uploadedImages.value.length
   
   if (imageFiles.length === 0) {
-    alert('Lütfen sadece resim dosyaları seçin.')
+    uploadError.value = 'Lütfen sadece resim dosyaları seçin.'
     return
   }
   
   if (imageFiles.length > remainingSlots) {
-    alert(`Sadece ${remainingSlots} resim daha ekleyebilirsiniz.`)
+    uploadError.value = `Sadece ${remainingSlots} resim daha ekleyebilirsiniz.`
     imageFiles.splice(remainingSlots)
+  }
+  
+  // Dosya boyutu kontrolü (10MB limit)
+  const oversizedFiles = imageFiles.filter(file => file.size > 10 * 1024 * 1024)
+  if (oversizedFiles.length > 0) {
+    uploadError.value = 'Resim dosyaları 10MB\'dan küçük olmalıdır.'
+    return
   }
   
   uploading.value = true
   uploadProgress.value = 0
+  uploadError.value = ''
   
-  // Simulate upload progress
-  const progressInterval = setInterval(() => {
-    uploadProgress.value += 10
-    if (uploadProgress.value >= 100) {
-      clearInterval(progressInterval)
-      uploading.value = false
-      uploadProgress.value = 0
-    }
-  }, 100)
-  
-  // Process each file
-  imageFiles.forEach((file, index) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
+  try {
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i]
+      currentUploadFile.value = `${file.name} (${i + 1}/${imageFiles.length})`
+      
+      // Cloudinary'ye yükle
+      const result = await uploadImageToCloudinary(file)
+      
+      // Thumbnail URL'si oluştur
+      const thumbnail = getThumbnailUrl(result.publicId, 150)
+      
       const newImage = {
-        id: Date.now() + index,
-        url: e.target.result,
-        file: file,
+        id: Date.now() + i,
+        url: result.url,
+        publicId: result.publicId,
+        thumbnail: thumbnail,
+        width: result.width,
+        height: result.height,
+        format: result.format,
+        bytes: result.bytes,
         name: file.name
       }
       
       uploadedImages.value = [...uploadedImages.value, newImage]
+      
+      // Progress güncelle
+      uploadProgress.value = Math.round(((i + 1) / imageFiles.length) * 100)
     }
-    reader.readAsDataURL(file)
-  })
+  } catch (error) {
+    console.error('Upload error:', error)
+    uploadError.value = 'Resim yükleme başarısız: ' + error.message
+  } finally {
+    uploading.value = false
+    uploadProgress.value = 0
+    currentUploadFile.value = ''
+  }
 }
 
 const removeImage = (index) => {
@@ -199,6 +237,13 @@ const moveImage = (index, direction) => {
     newImages[newIndex] = temp
     uploadedImages.value = newImages
   }
+}
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return ''
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
 }
 </script>
 
@@ -367,6 +412,18 @@ const moveImage = (index, direction) => {
   font-size: 0.8rem;
 }
 
+.image-info {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
 .upload-progress {
   margin-top: 1rem;
   display: flex;
@@ -392,6 +449,33 @@ const moveImage = (index, direction) => {
   color: #b0b0b0;
   font-size: 0.9rem;
   min-width: 40px;
+}
+
+.upload-error {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f44336;
+  color: white;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.retry-btn {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s ease;
+}
+
+.retry-btn:hover {
+  background-color: #388E3C;
 }
 
 /* Responsive */

@@ -36,11 +36,23 @@ const props = defineProps({
   },
   center: {
     type: Object,
-    default: () => ({ lat: 39.9334, lng: 32.8597 }) // Türkiye merkezi
+    default: () => ({ lat: 36.5433, lng: 31.9973 }) // Alanya Cuma Pazarı
   },
   zoom: {
     type: Number,
-    default: 6
+    default: 14 // Daha yakın zoom
+  },
+  selectable: {
+    type: Boolean,
+    default: false
+  },
+  onSelect: {
+    type: Function,
+    default: null
+  },
+  selectedCoord: {
+    type: Object,
+    default: null
   }
 })
 
@@ -49,6 +61,7 @@ let map = null
 let mapFullscreen = null
 let markers = []
 let markersFullscreen = []
+let marker = null
 
 // Fullscreen state
 const isFullscreen = ref(false)
@@ -74,6 +87,17 @@ watch(isFullscreen, async (val) => {
   }
 })
 
+watch(() => props.selectedCoord, (val) => {
+  if (val) {
+    if (marker) {
+      marker.setLatLng([val.lat, val.lng])
+    } else {
+      marker = L.marker([val.lat, val.lng]).addTo(map)
+    }
+    map.setView([val.lat, val.lng], 13)
+  }
+})
+
 const initMap = () => {
   // Create map
   map = L.map('map').setView([props.center.lat, props.center.lng], props.zoom)
@@ -86,6 +110,21 @@ const initMap = () => {
   
   // Add markers for initial listings
   updateMarkers(props.listings)
+
+  if (props.selectable) {
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng
+      if (marker) {
+        marker.setLatLng([lat, lng])
+      } else {
+        marker = L.marker([lat, lng]).addTo(map)
+      }
+      if (props.onSelect) props.onSelect({ lat, lng })
+    })
+    if (props.selectedCoord) {
+      marker = L.marker([props.selectedCoord.lat, props.selectedCoord.lng]).addTo(map)
+    }
+  }
 }
 
 const initMapFullscreen = () => {

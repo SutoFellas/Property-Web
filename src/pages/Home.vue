@@ -19,7 +19,7 @@
         <!-- Sıralama Seçeneği -->
         <div class="sort-section">
           <label for="sortSelect">Sırala:</label>
-          <select id="sortSelect" v-model="sortOption" @change="sortListings">
+          <select id="sortSelect" v-model="sortOption" @change="sortListingsAndCloseSidebar">
             <option value="default">Varsayılan</option>
             <option value="price-asc">Ucuzdan Pahalıya</option>
             <option value="price-desc">Pahalıdan Ucuza</option>
@@ -33,7 +33,7 @@
         <div class="filters">
           <div class="filter-group">
             <label>Bölge:</label>
-            <select v-model="selectedRegion" @change="filterListings">
+            <select v-model="selectedRegion" @change="filterListingsAndCloseSidebar">
               <option value="">Tümü</option>
               <option value="İstanbul">İstanbul</option>
               <option value="Ankara">Ankara</option>
@@ -44,7 +44,7 @@
 
           <div class="filter-group">
             <label>Mülk Tipi:</label>
-            <select v-model="selectedType" @change="filterListings">
+            <select v-model="selectedType" @change="filterListingsAndCloseSidebar">
               <option value="">Tümü</option>
               <option value="apartment">Daire</option>
               <option value="house">Ev</option>
@@ -54,7 +54,7 @@
 
           <div class="filter-group">
             <label>İşlem Tipi:</label>
-            <select v-model="selectedTransaction" @change="filterListings">
+            <select v-model="selectedTransaction" @change="filterListingsAndCloseSidebar">
               <option value="">Tümü</option>
               <option value="sale">Satılık</option>
               <option value="rent">Kiralık</option>
@@ -79,7 +79,7 @@
       <!-- Main Content -->
       <div class="content-area">
         <!-- Mobile Filter Toggle -->
-        <div class="mobile-filter-toggle">
+        <div class="mobile-filter-toggle always-visible">
           <button @click="toggleSidebar" class="filter-toggle-btn">
             <span>☰</span> Filtreler
           </button>
@@ -95,7 +95,7 @@
           >
             <div class="listing-image">
               <img 
-                :src="listing.images && listing.images.length > 0 ? listing.images[0] : '/placeholder.jpg'" 
+                :src="getListingImageUrl(listing)" 
                 :alt="listing.title"
               >
               <div class="listing-badge" :class="listing.transactionType">
@@ -128,6 +128,10 @@ import { useListingsStore } from '../store/listings'
 import CurrencySwitcher from '../components/CurrencySwitcher.vue'
 import MapView from '../components/MapView.vue'
 import logo from '../assets/Opera Anlık Görüntü_2025-07-08_001832_www.instagram.com.png'
+import { onMounted } from 'vue'
+import { db } from '../firebase'
+import { collection, getDocs } from 'firebase/firestore'
+import { getOptimizedImageUrl } from '../utils/cloudinary.js'
 
 export default {
   name: 'Home',
@@ -151,12 +155,35 @@ export default {
       return useListingsStore().listings
     }
   },
-  mounted() {
-    this.filteredListings = this.listings
+  async mounted() {
+    try {
+      // Firestore'dan ilanları çek
+      const querySnapshot = await getDocs(collection(db, 'listings'));
+      const firebaseListings = querySnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+      
+      // Sadece Firebase'den gelen ilanları göster
+      this.filteredListings = firebaseListings;
+    } catch (error) {
+      console.error('Firebase error:', error);
+      // Firebase hatası varsa sadece store'dan al
+      const store = useListingsStore();
+      this.filteredListings = store.listings;
+    }
   },
   methods: {
     toggleSidebar() {
       this.sidebarOpen = !this.sidebarOpen
+    },
+    sortListingsAndCloseSidebar() {
+      this.sortListings()
+      if (window.innerWidth <= 900) this.sidebarOpen = false
+    },
+    filterListingsAndCloseSidebar() {
+      this.filterListings()
+      if (window.innerWidth <= 900) this.sidebarOpen = false
     },
     sortListings() {
       let sorted = [...this.filteredListings]
@@ -180,7 +207,6 @@ export default {
         const regionMatch = !this.selectedRegion || listing.region === this.selectedRegion
         const typeMatch = !this.selectedType || listing.propertyType === this.selectedType
         const transactionMatch = !this.selectedTransaction || listing.transactionType === this.selectedTransaction
-        
         return regionMatch && typeMatch && transactionMatch
       })
       this.sortListings()
@@ -198,7 +224,6 @@ export default {
       const currency = store.selectedCurrency
       const rate = store.currencyRates[currency]
       const convertedPrice = price * rate
-      
       return new Intl.NumberFormat('tr-TR', {
         style: 'currency',
         currency: currency
@@ -206,8 +231,36 @@ export default {
     },
     formatDate(ts) {
       if (!ts) return ''
+      if (typeof ts === 'object' && ts.seconds) {
+        // Firestore Timestamp
+        return new Date(ts.seconds * 1000).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      }
       const d = new Date(ts)
       return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    },
+    getListingImageUrl(listing) {
+      if (!listing.images || listing.images.length === 0) {
+        return '/placeholder.jpg'
+      }
+      
+      const imageUrl = listing.images[0]
+      
+      // Eğer Cloudinary URL'si ise optimize et
+      if (imageUrl.includes('cloudinary.com')) {
+        // Public ID'yi URL'den çıkar
+        const publicId = imageUrl.split('/upload/')[1]?.split('.')[0]
+        if (publicId) {
+          return getOptimizedImageUrl(publicId, {
+            width: 400,
+            height: 300,
+            crop: 'fill',
+            quality: '85',
+            format: 'auto'
+          })
+        }
+      }
+      
+      return imageUrl
     },
     viewListing(id) {
       this.$router.push(`/listing/${id}`)
@@ -705,6 +758,15 @@ export default {
   }
   .main-layout {
     flex-direction: column;
+  }
+  .mobile-filter-toggle.always-visible {
+    display: flex !important;
+    position: sticky;
+    top: 0;
+    z-index: 10000;
+    background: #232323;
+    padding: 0.5rem 0;
+    justify-content: flex-start;
   }
 }
 @media (max-width: 600px) {

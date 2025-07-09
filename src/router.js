@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Home from './pages/Home.vue';
 import Admin from './pages/Admin.vue';
+import ManageListings from './pages/ManageListings.vue';
 import ListingDetail from './pages/ListingDetail.vue';
 import About from './pages/About.vue';
 import Contact from './pages/Contact.vue';
@@ -15,6 +16,11 @@ const routes = [
     path: '/admin',
     name: 'Admin',
     component: Admin
+  },
+  {
+    path: '/admin/manage-listings',
+    name: 'ManageListings',
+    component: ManageListings
   },
   {
     path: '/listing/:id',

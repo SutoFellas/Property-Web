@@ -1,313 +1,106 @@
 <template>
-  <div class="admin-page">
-    <h1 class="admin-title">Admin Paneli</h1>
-    <div class="container">
-      <!-- İlan Ekleme Formu -->
-      <section class="add-listing">
-        <h2>Yeni İlan Ekle</h2>
-        <form @submit.prevent="addListing" class="listing-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>İlan Başlığı</label>
-              <input 
-                v-model="newListing.title" 
-                type="text" 
-                required 
-                placeholder="Örn: Modern 3+1 Daire"
-              >
+  <div class="admin-container">
+    <div v-if="!isLoggedIn">
+      <h2>Admin Girişi</h2>
+      <form @submit.prevent="login">
+        <input v-model="email" type="email" placeholder="E-posta" required />
+        <input v-model="password" type="password" placeholder="Şifre" required />
+        <button type="submit">Giriş Yap</button>
+        <p v-if="error" class="error">{{ error }}</p>
+      </form>
             </div>
-            <div class="form-group">
-              <label>Konum</label>
-              <input 
-                v-model="newListing.location" 
-                type="text" 
-                required 
-                placeholder="Örn: Kadıköy, İstanbul"
-              >
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Kategori</label>
-              <select v-model="newListing.category" required>
-                <option value="">Seçiniz</option>
+    <div v-else>
+      <h2>İlan Ekle</h2>
+      <form @submit.prevent="addListing">
+        <input v-model="title" placeholder="Başlık" required />
+        <input v-model="location" placeholder="Konum" required />
+        <select v-model="category" required>
+          <option value="">Kategori Seç</option>
                 <option value="apartment">Daire</option>
                 <option value="shop">Dükkan</option>
                 <option value="house">Ev</option>
               </select>
-            </div>
-            <div class="form-group">
-              <label>İşlem Türü</label>
-              <select v-model="newListing.transactionType" required>
-                <option value="">Seçiniz</option>
+        <select v-model="transactionType" required>
+          <option value="">İşlem Türü Seç</option>
                 <option value="sale">Satılık</option>
                 <option value="rent">Kiralık</option>
               </select>
-            </div>
+        <input v-model.number="price" type="number" placeholder="Fiyat (TL)" required />
+        <input v-model.number="area" type="number" placeholder="Alan (m²)" required />
+        <input v-model.number="rooms" type="number" placeholder="Oda Sayısı" required />
+        <textarea v-model="description" placeholder="Açıklama" required></textarea>
+        <div style="margin-bottom:12px;">
+          <label style="color:#cd7f32; font-weight:600; margin-bottom:4px; display:block;">Konum Seç (Harita)</label>
+          <MapView 
+            :selectable="true" 
+            :onSelect="setCoordinates" 
+            :selectedCoord="coordinates" 
+            :center="{ lat: 36.5433, lng: 31.9973 }"
+            :zoom="15"
+            style="height:400px;" 
+          />
+          <div v-if="coordinates.lat && coordinates.lng" style="color:#fff; font-size:0.95em; margin-top:4px;">
+            Seçilen Konum: {{ coordinates.lat.toFixed(5) }}, {{ coordinates.lng.toFixed(5) }}
+            <br><small style="color:#ccc;">Alanya Cuma Pazarı merkezli başlatıldı</small>
           </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Fiyat (TL)</label>
-              <input 
-                v-model.number="newListing.price" 
-                type="number" 
-                required 
-                placeholder="2500000"
-                step="0.01"
-              >
-            </div>
-            <div class="form-group">
-              <label>Alan (m²)</label>
-              <input 
-                v-model.number="newListing.area" 
-                type="number" 
-                required 
-                placeholder="120"
-              >
-            </div>
-            <div class="form-group">
-              <label>Oda Sayısı</label>
-              <input 
-                v-model.number="newListing.rooms" 
-                type="number" 
-                required 
-                placeholder="3"
-              >
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Resimler</label>
-            <ImageUploader 
-              v-model="newListing.images" 
-              :max-images="20"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Açıklama</label>
-            <textarea 
-              v-model="newListing.description" 
-              rows="4"
-              placeholder="İlan açıklaması..."
-            ></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>Koordinatlar (Harita için)</label>
-            <div class="coordinates-input">
-              <input 
-                v-model.number="newListing.coordinates.lat" 
-                type="number" 
-                step="any"
-                placeholder="Enlem (41.0082)"
-              >
-              <input 
-                v-model.number="newListing.coordinates.lng" 
-                type="number" 
-                step="any"
-                placeholder="Boylam (28.9784)"
-              >
-            </div>
-          </div>
-
-          <button type="submit" class="btn-primary">İlan Ekle</button>
-        </form>
-      </section>
-
-      <!-- İlan Yönetimi -->
-      <section class="manage-listings">
-        <h2>İlan Yönetimi</h2>
+        </div>
+        <ImageUploader v-model="images" :max-images="10" />
+        <button type="submit">İlanı Kaydet</button>
+        <transition name="fade">
+          <p v-if="addSuccess" class="success-toast">İlan başarıyla yüklendi!</p>
+        </transition>
+        <p v-if="addError" class="error">{{ addError }}</p>
+      </form>
+      
+      <div class="admin-actions">
+        <h2>İşlemler</h2>
+        <div class="action-buttons">
+          <router-link to="/admin/manage-listings" class="action-btn manage-btn">
+            📋 İlanları Yönet
+          </router-link>
+          <button @click="refreshStats" class="action-btn stats-btn">
+            📊 İstatistikler
+          </button>
+        </div>
         
-        <!-- Filtreler -->
-        <div class="filters">
-          <div class="filter-group">
-            <label>Kategori:</label>
-            <select v-model="filterCategory">
-              <option value="">Tümü</option>
-              <option value="apartment">Daire</option>
-              <option value="shop">Dükkan</option>
-              <option value="house">Ev</option>
-            </select>
+        <div v-if="stats" class="stats-section">
+          <h3>Özet Bilgiler</h3>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-number">{{ stats.total }}</div>
+              <div class="stat-label">Toplam İlan</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">{{ stats.sale }}</div>
+              <div class="stat-label">Satılık</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">{{ stats.rent }}</div>
+              <div class="stat-label">Kiralık</div>
+            </div>
           </div>
-          <div class="filter-group">
-            <label>İşlem:</label>
-            <select v-model="filterType">
-              <option value="">Tümü</option>
-              <option value="sale">Satılık</option>
-              <option value="rent">Kiralık</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- İlan Listesi -->
-        <div class="listings-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Resim</th>
-                <th>Başlık</th>
-                <th>Konum</th>
-                <th>Kategori</th>
-                <th>İşlem</th>
-                <th>Fiyat</th>
-                <th>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="listing in filteredListings" :key="listing.id">
-                <td>
-                  <img :src="listing.images && listing.images.length > 0 ? listing.images[0] : '/placeholder-image.jpg'" :alt="listing.title" class="listing-thumb">
-                </td>
-                <td>{{ listing.title }}</td>
-                <td>{{ listing.location }}</td>
-                <td>
-                  <span :class="['badge', getCategoryClass(listing.category)]">
-                    {{ getCategoryName(listing.category) }}
-                  </span>
-                </td>
-                <td>
-                  <span :class="['badge', listing.transactionType === 'sale' ? 'badge-sale' : 'badge-rent']">
-                    {{ listing.transactionType === 'sale' ? 'Satılık' : 'Kiralık' }}
-                  </span>
-                </td>
-                <td>
-                  <div class="price-edit">
-                    <input 
-                      v-model.number="listing.price" 
-                      type="number" 
-                      @change="updatePrice(listing.id, listing.price)"
-                      class="price-input"
-                    >
-                    <span class="currency">TL</span>
-                  </div>
-                </td>
-                <td>
-                  <div class="actions">
-                    <button @click="editListing(listing)" class="btn-edit">Düzenle</button>
-                    <button @click="deleteListing(listing.id)" class="btn-delete">Sil</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Düzenleme Modal -->
-      <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
-        <div class="modal" @click.stop>
-          <h3>İlan Düzenle</h3>
-          <form @submit.prevent="saveEdit" class="listing-form">
-            <div class="form-row">
-              <div class="form-group">
-                <label>İlan Başlığı</label>
-                <input v-model="editingListing.title" type="text" required>
-              </div>
-              <div class="form-group">
-                <label>Konum</label>
-                <input v-model="editingListing.location" type="text" required>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>Kategori</label>
-                <select v-model="editingListing.category" required>
-                  <option value="apartment">Daire</option>
-                  <option value="shop">Dükkan</option>
-                  <option value="house">Ev</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>İşlem Türü</label>
-                <select v-model="editingListing.transactionType" required>
-                  <option value="sale">Satılık</option>
-                  <option value="rent">Kiralık</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>Fiyat (TL)</label>
-                <input v-model.number="editingListing.price" type="number" required>
-              </div>
-              <div class="form-group">
-                <label>Alan (m²)</label>
-                <input v-model.number="editingListing.area" type="number" required>
-              </div>
-              <div class="form-group">
-                <label>Oda Sayısı</label>
-                <input v-model.number="editingListing.rooms" type="number" required>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Resimler</label>
-              <ImageUploader 
-                v-model="editingListing.images" 
-                :max-images="20"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Açıklama</label>
-              <textarea 
-                v-model="editingListing.description" 
-                rows="4"
-                placeholder="İlan açıklaması..."
-              ></textarea>
-            </div>
-
-            <div class="form-group">
-              <label>Koordinatlar (Harita için)</label>
-              <div class="coordinates-input">
-                <input 
-                  v-model.number="editingListing.coordinates.lat" 
-                  type="number" 
-                  step="any"
-                  placeholder="Enlem (41.0082)"
-                >
-                <input 
-                  v-model.number="editingListing.coordinates.lng" 
-                  type="number" 
-                  step="any"
-                  placeholder="Boylam (28.9784)"
-                >
-              </div>
-            </div>
-
-            <div class="modal-actions">
-              <button type="submit" class="btn-primary">Kaydet</button>
-              <button type="button" @click="closeEditModal" class="btn-secondary">İptal</button>
-            </div>
-          </form>
         </div>
       </div>
+      <button @click="logout">Çıkış Yap</button>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue'
-import { useListingsStore } from '../store/listings'
-import ImageUploader from '../components/ImageUploader.vue'
+<script>
+import { auth, db } from '../firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { addDoc, collection, serverTimestamp, getDocs } from 'firebase/firestore';
+import ImageUploader from '../components/ImageUploader.vue';
+import MapView from '../components/MapView.vue';
 
-const listingsStore = useListingsStore()
-
-// Filtreler
-const filterCategory = ref('')
-const filterType = ref('')
-
-// Modal state
-const showEditModal = ref(false)
-const editingListing = ref({})
-
-// Yeni ilan formu
-const newListing = ref({
+export default {
+  components: { ImageUploader, MapView },
+  data() {
+    return {
+      email: '',
+      password: '',
+      isLoggedIn: false,
+      error: '',
   title: '',
   location: '',
   category: '',
@@ -315,474 +108,286 @@ const newListing = ref({
   price: '',
   area: '',
   rooms: '',
+      description: '',
+      coordinates: { lat: '', lng: '' },
   images: [],
-  description: '',
-  coordinates: {
-    lat: '',
-    lng: ''
-  }
-})
-
-// Store'dan ilanları al
-const listings = computed(() => listingsStore.listings)
-
-// Filtrelenmiş ilanlar
-const filteredListings = computed(() => {
-  return listings.value.filter(listing => {
-    const categoryMatch = !filterCategory.value || listing.category === filterCategory.value
-    const typeMatch = !filterType.value || listing.transactionType === filterType.value
-    return categoryMatch && typeMatch
-  })
-})
-
-// İlan ekleme
-const addListing = () => {
-  const listing = {
-    ...newListing.value,
-    type: newListing.value.transactionType === 'sale' ? 'Satılık' : 'Kiralık',
-    images: newListing.value.images.map(img => img.url) // Convert to simple URL array
-  }
-  
-  listingsStore.addListing(listing)
-  
-  // Formu temizle
-  newListing.value = {
-    title: '',
-    location: '',
-    category: '',
-    transactionType: '',
-    price: '',
-    area: '',
-    rooms: '',
-    images: [],
-    description: '',
-    coordinates: { lat: '', lng: '' }
-  }
-  
-  alert('İlan başarıyla eklendi!')
-}
-
-// İlan düzenleme
-const editListing = (listing) => {
-  editingListing.value = { 
-    ...listing,
-    images: listing.images.map(url => ({ url, id: Date.now() + Math.random() }))
-  }
-  showEditModal.value = true
-}
-
-// Düzenlemeyi kaydet
-const saveEdit = () => {
-  const updatedListing = {
-    ...editingListing.value,
-    images: editingListing.value.images.map(img => img.url) // Convert to simple URL array
-  }
-  
-  listingsStore.updateListing(editingListing.value.id, updatedListing)
-  closeEditModal()
-  alert('İlan başarıyla güncellendi!')
-}
-
-// Modal kapat
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingListing.value = {}
-}
-
-// İlan silme
-const deleteListing = (id) => {
-  if (confirm('Bu ilanı silmek istediğinizden emin misiniz?')) {
-    listingsStore.deleteListing(id)
-    alert('İlan başarıyla silindi!')
-  }
-}
-
-// Fiyat güncelleme
-const updatePrice = (id, newPrice) => {
-  listingsStore.updatePrice(id, newPrice)
-}
-
-// Kategori adı
-const getCategoryName = (category) => {
-  const names = {
-    apartment: 'Daire',
-    shop: 'Dükkan',
-    house: 'Ev'
-  }
-  return names[category] || category
-}
-
-// Kategori class
-const getCategoryClass = (category) => {
-  return `badge-${category}`
-}
+      addError: '',
+      addSuccess: false,
+      addSuccessTimeout: null,
+      stats: null,
+    };
+  },
+  methods: {
+    async login() {
+      this.error = '';
+      if (this.email !== 'admin@property.com') {
+        this.error = 'Sadece admin girişi yapılabilir.';
+        return;
+      }
+      try {
+        await signInWithEmailAndPassword(auth, this.email, this.password);
+        this.isLoggedIn = true;
+      } catch (e) {
+        this.error = 'Giriş başarısız: ' + e.message;
+      }
+    },
+    async logout() {
+      await signOut(auth);
+      this.isLoggedIn = false;
+      this.email = '';
+      this.password = '';
+    },
+    async addListing() {
+      this.addError = '';
+      this.addSuccess = false;
+      
+      // Cloudinary'den gelen resim URL'lerini al
+      let imageUrls = [];
+      if (this.images.length > 0) {
+        imageUrls = this.images.map(img => img.url);
+      }
+      
+      try {
+        await addDoc(collection(db, 'listings'), {
+          title: this.title,
+          location: this.location,
+          region: this.location, // Filtreleme için region alanı da ekleyelim
+          category: this.category,
+          propertyType: this.category, // Home.vue'daki filtreleme ile uyumlu
+          transactionType: this.transactionType,
+          price: this.price,
+          area: this.area,
+          rooms: this.rooms,
+          description: this.description,
+          coordinates: this.coordinates,
+          images: imageUrls,
+          createdAt: serverTimestamp(),
+        });
+        this.title = '';
+        this.location = '';
+        this.category = '';
+        this.transactionType = '';
+        this.price = '';
+        this.area = '';
+        this.rooms = '';
+        this.description = '';
+        this.coordinates = { lat: '', lng: '' };
+        this.images = [];
+        this.addSuccess = true;
+        this.refreshStats(); // İstatistikleri güncelle
+        if (this.addSuccessTimeout) clearTimeout(this.addSuccessTimeout);
+        this.addSuccessTimeout = setTimeout(() => { this.addSuccess = false; }, 5000);
+      } catch (e) {
+        this.addError = 'İlan eklenemedi: ' + e.message;
+      }
+    },
+    async refreshStats() {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'listings'));
+        const listings = querySnapshot.docs.map(doc => doc.data());
+        
+        this.stats = {
+          total: listings.length,
+          sale: listings.filter(l => l.transactionType === 'sale').length,
+          rent: listings.filter(l => l.transactionType === 'rent').length
+        };
+      } catch (error) {
+        console.error('İstatistikler yüklenemedi:', error);
+        alert('İstatistikler yüklenirken hata oluştu.');
+      }
+    },
+    setCoordinates(coord) {
+      this.coordinates = coord;
+    },
+  },
+};
 </script>
 
 <style scoped>
-.admin-page {
-  min-height: 100vh;
-  background: #181818;
-  color: #ffffff;
-}
-
-.container {
+.admin-container {
   max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-/* Header */
-.header {
+  margin: 40px auto;
+  padding: 24px;
+  border: 1px solid #333;
+  border-radius: 16px;
   background: #2c2c2c;
-  padding: 1rem 0;
-  border-bottom: 2px solid #cd7f32;
-  margin-bottom: 2rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
-
-.header .container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo {
-  color: #cd7f32;
-  font-size: 1.8rem;
-  font-weight: bold;
-  margin: 0;
-}
-
-.nav {
-  display: flex;
-  gap: 2rem;
-}
-
-.nav-link {
-  color: #b0b0b0;
-  text-decoration: none;
-  padding: 0.5rem 1rem;
+input, textarea, select {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 8px;
   border-radius: 4px;
-  transition: all 0.3s ease;
+  border: 1px solid #444;
+  background: #181818;
+  color: #fff;
 }
-
-.nav-link:hover,
-.nav-link.active {
+input::placeholder, textarea::placeholder {
+  color: #b0b0b0;
+}
+.coordinates-row {
+  display: flex;
+  gap: 8px;
+}
+button {
+  padding: 8px 16px;
+  border: none;
+  background: #cd7f32;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 4px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+button:hover {
+  background: #a86a28;
+}
+.error {
+  color: #e74c3c;
+  margin-top: 8px;
+}
+.success {
+  color: #27ae60;
+  margin-top: 8px;
+}
+.listings-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 32px;
+  margin-bottom: 32px;
+  background: #222;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.listings-table th, .listings-table td {
+  border: 1px solid #333;
+  padding: 8px;
+  text-align: left;
+  color: #fff;
+}
+.listings-table th {
+  background: #181818;
   color: #cd7f32;
-  background: rgba(205, 127, 50, 0.1);
 }
-
-/* Sections */
-section {
-  background: #2c2c2c;
+.images-list {
+  display: flex;
+  flex-wrap: wrap;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+.success-toast {
+  background: rgba(39, 174, 96, 0.85);
+  color: #fff;
+  padding: 12px 24px;
   border-radius: 8px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  border: 1px solid #404040;
+  margin: 16px 0 0 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(39,174,96,0.12);
+  text-align: center;
+  z-index: 10;
 }
 
-section h2 {
+.admin-actions {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #333;
+}
+
+.admin-actions h2 {
   color: #cd7f32;
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
 }
 
-/* Form */
-.listing-form {
+.action-buttons {
   display: flex;
-  flex-direction: column;
   gap: 1rem;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  color: #cd7f32;
-  font-weight: 500;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 0.75rem;
-  border: 1px solid #404040;
-  border-radius: 4px;
-  background: #181818;
-  color: #ffffff;
-  font-size: 1rem;
-  font-family: inherit;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #cd7f32;
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 100px;
-}
-
-.coordinates-input {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-/* Buttons */
-.btn-primary {
-  background: #cd7f32;
-  color: #ffffff;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-  background: #b36628;
-}
-
-.btn-secondary {
-  background: #404040;
-  color: #ffffff;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-}
-
-.btn-secondary:hover {
-  background: #505050;
-}
-
-/* Filters */
-.filters {
-  display: flex;
-  gap: 2rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   flex-wrap: wrap;
 }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.filter-group label {
-  color: #cd7f32;
-  font-weight: 500;
-}
-
-.filter-group select {
-  padding: 0.5rem;
-  border: 1px solid #404040;
-  border-radius: 4px;
-  background: #181818;
-  color: #ffffff;
-}
-
-/* Table */
-.listings-table {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-
-th, td {
-  padding: 1rem;
-  text-align: left;
-  border-bottom: 1px solid #404040;
-}
-
-th {
-  background: #404040;
-  color: #cd7f32;
-  font-weight: 600;
-}
-
-.listing-thumb {
-  width: 60px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-/* Badges */
-.badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.badge-apartment {
-  background: #4a90e2;
-  color: #ffffff;
-}
-
-.badge-shop {
-  background: #f39c12;
-  color: #ffffff;
-}
-
-.badge-house {
-  background: #27ae60;
-  color: #ffffff;
-}
-
-.badge-sale {
-  background: #e74c3c;
-  color: #ffffff;
-}
-
-.badge-rent {
-  background: #9b59b6;
-  color: #ffffff;
-}
-
-/* Price Edit */
-.price-edit {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.price-input {
-  width: 100px;
-  padding: 0.25rem;
-  border: 1px solid #404040;
-  border-radius: 4px;
-  background: #181818;
-  color: #ffffff;
-  font-size: 0.9rem;
-}
-
-.currency {
-  color: #cd7f32;
-  font-size: 0.9rem;
-}
-
-/* Actions */
-.actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.btn-edit {
-  background: #3498db;
-  color: #ffffff;
+.action-btn {
+  padding: 1rem 1.5rem;
   border: none;
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.3s ease;
-}
-
-.btn-edit:hover {
-  background: #2980b9;
-}
-
-.btn-delete {
-  background: #e74c3c;
-  color: #ffffff;
-  border: none;
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.3s ease;
-}
-
-.btn-delete:hover {
-  background: #c0392b;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: #2c2c2c;
   border-radius: 8px;
-  padding: 2rem;
-  max-width: 600px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  border: 1px solid #404040;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  font-size: 1rem;
 }
 
-.modal h3 {
+.manage-btn {
+  background: #cd7f32;
+  color: #fff;
+}
+
+.manage-btn:hover {
+  background: #a86828;
+  transform: translateY(-2px);
+}
+
+.stats-btn {
+  background: #3498db;
+  color: #fff;
+}
+
+.stats-btn:hover {
+  background: #2980b9;
+  transform: translateY(-2px);
+}
+
+.stats-section {
+  margin-top: 2rem;
+}
+
+.stats-section h3 {
   color: #cd7f32;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
 }
 
-.modal-actions {
-  display: flex;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 1rem;
-  margin-top: 1rem;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-  
-  .filters {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .coordinates-input {
-    grid-template-columns: 1fr;
-  }
-  
-  .modal {
-    width: 95%;
-    padding: 1rem;
-  }
-}
-
-.admin-title {
-  color: #cd7f32;
-  font-size: 2.2rem;
-  margin: 2.5rem 0 2rem 0;
+.stat-card {
+  background: #333;
+  padding: 1.5rem;
+  border-radius: 8px;
   text-align: center;
+  border: 1px solid #444;
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.stat-number {
+  font-size: 2rem;
   font-weight: bold;
-  letter-spacing: 1px;
+  color: #cd7f32;
+  margin-bottom: 0.5rem;
+}
+
+.stat-label {
+  color: #ccc;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 </style> 
